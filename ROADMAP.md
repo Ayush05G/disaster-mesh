@@ -169,6 +169,33 @@ number before treating Phase 2 as fully exited.
 up via anti-entropy; mDNS verified against a second physical machine (the firewall check);
 **M2**.
 
+**Status:** M2 passed — `scripts/multi_node_harness.py` automates both checks (3-node
+cold-start convergence in ~2s; kill node mid-run, ingest elsewhere, restart, reconverge via
+anti-entropy in ~2s), fan-in bootstrap topology, no manual steps. mDNS discovery is
+implemented (`@libp2p/mdns`) and is the production peer-discovery path, but the harness
+uses explicit bootstrap addresses instead of relying on mDNS multicast for same-machine
+determinism — Windows multicast/firewall behavior was already flagged as unverified in the
+risk register below, and this doesn't remove that need. **mDNS-on-a-second-physical-machine
+remains unverified**, same class of blocker as Ollama/admin-rights in earlier phases: needs
+a second device, not something resolvable in this environment.
+
+**Real finding, worth recording so it isn't rediscovered the hard way:**
+`@chainsafe/libp2p-gossipsub@14.1.2` (latest at time of writing) depends on
+`@libp2p/interface@^2.x`, while `libp2p@^3.x` (also latest) depends on
+`@libp2p/interface@^3.x` — gossipsub has not yet been updated for libp2p v3. Installing
+everything at `^latest` (the natural first move) silently splits the dependency tree:
+peers connect fine, anti-entropy works, but gossipsub's `getSubscribers()` never returns
+anyone and live gossip never fires — no error, just permanent silence. `src/network/package.json`
+pins the whole stack to the last mutually-compatible v2-line versions (`libp2p@2.10.0`,
+`@libp2p/tcp@10.1.19`, `@libp2p/mdns@11.0.47`, `@libp2p/identify@3.0.39`,
+`@chainsafe/libp2p-noise@16.1.5`, `@chainsafe/libp2p-yamux@7.0.4`), verified via
+`npm ls @libp2p/interface` showing a single deduped `2.11.0`. **Do not bump these
+individually** — re-run that check after any version change in `src/network`. On this
+pinned stack, `Stream` is the classic `{source, sink}` async-iterable Duplex (`it-pipe` +
+`it-length-prefixed`); a stray attempt to use `libp2p@3.x`'s newer `MessageStream`
+(`.send()`/native async-iteration/no half-close) during debugging is *not* what's running
+here — don't mix API styles from v3-era docs or examples.
+
 ## Phase 4 — React Dashboard *(Sonnet 5)*
 
 - Vite + React, every asset vendored; build audit script greps `dist/` for `https?://`
@@ -219,6 +246,7 @@ The phase that makes the project's premise true — until here, "edge device" me
 | True ad-hoc Wi-Fi expectation creep | 3 | Scope decision 1; backlog, not critical path |
 | Offline map tiles ambush Phase 4 | 4 | Region + PMTiles decided at phase start |
 | phi3 doesn't fit Pi 4 2 GB | 6 | Mock-only Pi node is acceptable — Pi still meshes and displays; record the measurement |
+| gossipsub/libp2p-core version split (gossipsub still targets `@libp2p/interface@^2.x`) silently kills live gossip | 3 | Whole `src/network` stack pinned to the mutually-compatible v2 line; verify with `npm ls @libp2p/interface` after any dependency change |
 
 ## Explicitly not phases (backlog)
 

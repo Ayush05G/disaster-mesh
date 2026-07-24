@@ -39,6 +39,28 @@ For Phase 2+:
 3. Verify it's running: `curl http://localhost:11434/api/status`
 4. Run the worker: `python src/ai_engine/main.py`
 
+## P2P mesh transport (Phase 3)
+
+```powershell
+cd src\network
+npm install
+node peer.js
+```
+
+Env vars: `AETHER_NODE_ID`, `AETHER_LEDGER_URL` (default `http://127.0.0.1:8700`),
+`AETHER_P2P_PORT` (default `9000`), `AETHER_DATA_DIR`, `AETHER_BOOTSTRAP_PEERS`
+(comma-separated multiaddrs — supplements mDNS, useful when multicast is blocked).
+
+Dependency versions in `src/network/package.json` are pinned, not `^latest` — gossipsub
+hasn't caught up to libp2p's latest major yet, and mixing them breaks gossip silently.
+See ROADMAP Phase 3 status before changing any of them.
+
+To exercise the whole transport locally (3-node convergence + kill/restart catch-up),
+without needing a second physical machine:
+```powershell
+python scripts\multi_node_harness.py --nodes 3
+```
+
 ## Windows Firewall
 
 **Phase 3+ (P2P mesh networking):** Python and Node processes need private-network inbound
