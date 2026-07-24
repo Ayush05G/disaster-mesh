@@ -127,6 +127,15 @@ green; `git log -1 --format='%an <%ae>'` → `ayush05g <ayush2425.rk@gmail.com>`
 **Exit:** property tests green; 10k-event ledger load measured within a Pi-ish memory
 budget (record the number).
 
+**Measured (this laptop, Python 3.12.10):** 10k events cold-load in 0.2s, 41 MB RSS delta
+(single Ledger instance, isolated process), 2.16 MB on disk. Comfortably inside a 2 GB Pi
+budget even with headroom for the other two processes. Write throughput is ~157
+events/sec (6.4 ms/event) — the cost of fsync-per-append, a deliberate crash-safety
+tradeoff (see `_append_to_disk`). Fine for hazard-reporting cadence; would need revisiting
+only if a single node's *local* ingest rate ever needed to sustain >100 events/sec, which
+this project doesn't anticipate. Unbounded event growth over a long deployment remains a
+backlog item (ledger compaction).
+
 ## Phase 2 — Edge AI Engine *(Sonnet 5)*
 
 - Async Ollama client, `timeout=5.0`, **structured outputs** (`format` = payload JSON

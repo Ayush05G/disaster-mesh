@@ -16,11 +16,24 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-## Ollama (Phase 1+)
+## Ledger service (Phase 1)
 
-Phase 0 uses `AETHER_AI_BACKEND=mock` and does not require Ollama.
+The D4 API contract. Runs on `localhost:8700`, localhost only.
 
-For Phase 1+:
+```powershell
+uvicorn ai_engine.ledger_service:get_app --factory --host 127.0.0.1 --port 8700
+```
+
+`get_app` is a factory (not a module-level `app`) so importing the module never has a
+disk side effect — see the docstring in `ledger_service.py` if that seems unusual.
+
+Env vars: `AETHER_NODE_ID` (default `node_local`), `AETHER_DATA_DIR` (default `data/<node_id>`).
+
+## Ollama (Phase 2+)
+
+Phase 0 and Phase 1 use `AETHER_AI_BACKEND=mock` and do not require Ollama.
+
+For Phase 2+:
 1. Install Ollama for Windows from https://ollama.ai
 2. Pull the model: `ollama pull phi3:mini` (~2.3 GB)
 3. Verify it's running: `curl http://localhost:11434/api/status`

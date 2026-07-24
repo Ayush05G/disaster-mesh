@@ -1,0 +1,51 @@
+{
+  "examples": [
+    {
+      "coordinates": {
+        "lat": 40.7128,
+        "lng": -74.006
+      },
+      "hazard_type": "flooding",
+      "node_id": "node_alpha",
+      "severity": "HIGH",
+      "timestamp": "2026-07-24T12:34:56Z"
+    }
+  ],
+  "properties": {
+    "node_id": {
+      "title": "Node Id",
+      "type": "string"
+    },
+    "timestamp": {
+      "description": "ISO-8601 string, display metadata only",
+      "title": "Timestamp",
+      "type": "string"
+    },
+    "hazard_type": {
+      "title": "Hazard Type",
+      "type": "string"
+    },
+    "severity": {
+      "pattern": "^(LOW|MEDIUM|HIGH)$",
+      "title": "Severity",
+      "type": "string"
+    },
+    "coordinates": {
+      "additionalProperties": {
+        "type": "number"
+      },
+      "description": "lat/lng in decimal degrees",
+      "title": "Coordinates",
+      "type": "object"
+    }
+  },
+  "required": [
+    "node_id",
+    "timestamp",
+    "hazard_type",
+    "severity",
+    "coordinates"
+  ],
+  "title": "HazardPayload",
+  "type": "object"
+}
