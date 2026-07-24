@@ -149,6 +149,15 @@ backlog item (ledger compaction).
 **Exit:** worker survives model-off / model-slow / garbage-output; **M1** — sensor text
 in, valid hazard in ledger, mock *and* real.
 
+**Status:** M1 verified end-to-end in mock mode (real ledger service, real HTTP, no
+sockets skipped) — 5/5 demo hazards ingested. Chaos tests cover model-off, model-slow,
+garbage-output, ledger-unreachable, and mixed failures mid-batch; the worker never raises
+in any of them. The eval harness (`scripts/run_eval.py`, 20 fixtures) is built and unit
+tested, but the *real* pass-rate number — the one the Opus escalation trigger reads — is
+blocked on the same Ollama install issue as Phase 0 (admin rights). Until resolved: run
+`ollama pull phi3:mini` then `python scripts/run_eval.py --backend ollama` to get the real
+number before treating Phase 2 as fully exited.
+
 ## Phase 3 — P2P Mesh Transport *(Sonnet 5 — Node.js per D1)*
 
 - js-libp2p peer: mDNS discovery, gossipsub `aether/hazards/v1`
