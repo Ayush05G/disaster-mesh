@@ -25,6 +25,11 @@ Format: `- [ ] <idea> — surfaced in Phase N, <one-line why it was deferred>`
 - [ ] Mobile-phone nodes — the overview promises them; needs a mobile runtime story
       (Termux? React Native + native libp2p?) that doesn't exist in the V1 stack.
 - [ ] CI runner (GitHub Actions) — repo currently has no remote; tests run locally by rule.
+- [ ] Local PMTiles basemap for the dashboard — surfaced in Phase 4; deferred because the
+      region extract is a sized download needing an explicit OK (same class as the
+      phi3:mini pull). The inline graticule style works today; when a region is chosen,
+      add the `pmtiles` protocol adapter + vector layers, and extend the offline audit
+      allowlist only if the style JSON carries identifier URLs.
 
 ## Phase 0
 

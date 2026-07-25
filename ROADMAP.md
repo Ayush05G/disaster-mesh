@@ -208,6 +208,23 @@ here — don't mix API styles from v3-era docs or examples.
 **Exit:** fully functional with networking disabled; devtools shows zero non-localhost
 requests; renders 1k hazards without jank.
 
+**Status:** Exit checks verified in a real browser against a live ledger seeded with
+1,000 events across 4 simulated nodes: every network request was `localhost:5173` or an
+inline `data:` URI (nav-control icons) — zero external hosts; map canvas rendering via
+WebGL; Lamport-ordered feed (payload `timestamp` is never used for ordering, per scope
+decision 2); severity filter live-verified (1000 → 317 on HIGH-only); no console errors.
+Defense in depth for Critical Rule 1: (1) `scripts/audit-offline.js` fails `npm run build`
+on any non-allowlisted external URL in `dist/` — its first real catch was React's
+embedded `react.dev/errors/` decoder string, allowlisted as a never-fetched error-message
+URL; (2) a CSP meta tag (`connect-src 'self'` etc.) blocks any accidental external fetch
+in the browser itself; (3) all API calls are relative (`/api/...` via the Vite proxy), so
+no absolute origin exists in the bundle. **Basemap decision:** the map ships with a fully
+inline style (background + graticule + severity-colored hazard circles, deliberately no
+text layers — text would require glyph fetches). The local-PMTiles basemap remains the
+recorded upgrade path, deferred because the region extract is a sized download requiring
+an explicit OK — same class as the phi3:mini pull; nothing in the current map breaks when
+it lands. `maplibre-gl@6` note: default export removed, named imports only.
+
 ## Phase 5 — Resilience & Validation *(Sonnet 5)*
 
 - `scripts/simulate_disconnect.sh` driving the Phase 3 harness: partition → concurrent

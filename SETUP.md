@@ -61,6 +61,23 @@ without needing a second physical machine:
 python scripts\multi_node_harness.py --nodes 3
 ```
 
+## Dashboard (Phase 4)
+
+```powershell
+cd src\dashboard
+npm install
+npm run dev        # dev server on 127.0.0.1:5173, proxies /api -> localhost:8700
+```
+
+Production build + offline audit (fails if any external URL lands in `dist/`):
+```powershell
+npm run build
+npm run preview    # serve the built dist locally
+```
+
+The ledger service must be running on `:8700` for live data. The map style is fully
+inline (no tiles, no glyphs, no sprite) — see BACKLOG for the PMTiles basemap upgrade.
+
 ## Windows Firewall
 
 **Phase 3+ (P2P mesh networking):** Python and Node processes need private-network inbound
