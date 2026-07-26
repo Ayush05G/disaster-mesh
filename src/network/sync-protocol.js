@@ -20,26 +20,58 @@ import { fromString as u8FromString, toString as u8ToString } from "uint8arrays"
 
 export const SYNC_PROTOCOL = "/aether/sync/1.0.0";
 
+// AbortSignal passed to dialProtocol only bounds connection setup — once a
+// stream exists, a peer that accepts it and never sends data (or never
+// closes) can hang a plain `pipe(stream.source, ...)` read forever. Found
+// via Phase 5 chaos testing (a responder that accepts the stream and just
+// never replies): the requester blocked indefinitely despite passing a
+// `timeoutMs` all the way through, because nothing was actually enforcing
+// it on the read. This wraps a promise with a real deadline; the caller is
+// still responsible for closing the stream afterward so the loser of the
+// race doesn't keep running forever in the background.
+function withTimeout(promise, ms, message) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), ms);
+  });
+  // Swallow a late rejection/resolution from whichever side loses the
+  // race — otherwise closing the stream afterward can surface as an
+  // unhandled rejection here once the loser eventually settles.
+  promise.catch(() => {});
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
 // Responder side: a peer is pulling from us. Read their vector, send back
-// whatever events they're missing, per our own ledger.
-export function registerSyncHandler(libp2p, ledgerClient, logger) {
+// whatever events they're missing, per our own ledger. Guards against a
+// requester that dials and then never sends anything.
+export function registerSyncHandler(libp2p, ledgerClient, logger, timeoutMs = 5000) {
   libp2p.handle(SYNC_PROTOCOL, async ({ stream }) => {
     try {
-      await pipe(
-        stream.source,
-        (source) => lp.decode(source),
-        async function* (source) {
-          for await (const msg of source) {
-            const vector = JSON.parse(u8ToString(msg.subarray()));
-            const events = await ledgerClient.getEventsSince(vector);
-            yield u8FromString(JSON.stringify(events));
-          }
-        },
-        (source) => lp.encode(source),
-        stream.sink,
+      await withTimeout(
+        pipe(
+          stream.source,
+          (source) => lp.decode(source),
+          async function* (source) {
+            for await (const msg of source) {
+              const vector = JSON.parse(u8ToString(msg.subarray()));
+              const events = await ledgerClient.getEventsSince(vector);
+              yield u8FromString(JSON.stringify(events));
+            }
+          },
+          (source) => lp.encode(source),
+          stream.sink,
+        ),
+        timeoutMs,
+        `sync handler timed out after ${timeoutMs}ms waiting on requester`,
       );
     } catch (err) {
       logger.warn(`sync handler error: ${err.message}`);
+    } finally {
+      try {
+        await stream.close();
+      } catch {
+        // Already closed.
+      }
     }
   });
 }
@@ -54,14 +86,22 @@ export async function pullFromPeer(libp2p, ledgerClient, peerId, timeoutMs, logg
       signal: AbortSignal.timeout(timeoutMs),
     });
 
-    await pipe([u8FromString(JSON.stringify(localVector))], (source) => lp.encode(source), stream.sink);
+    await withTimeout(
+      pipe([u8FromString(JSON.stringify(localVector))], (source) => lp.encode(source), stream.sink),
+      timeoutMs,
+      `sync write timed out after ${timeoutMs}ms`,
+    );
 
     const responses = [];
-    await pipe(stream.source, (source) => lp.decode(source), async (source) => {
-      for await (const msg of source) {
-        responses.push(msg.subarray());
-      }
-    });
+    await withTimeout(
+      pipe(stream.source, (source) => lp.decode(source), async (source) => {
+        for await (const msg of source) {
+          responses.push(msg.subarray());
+        }
+      }),
+      timeoutMs,
+      `sync read timed out after ${timeoutMs}ms — peer accepted the stream but never responded`,
+    );
 
     if (responses.length === 0) {
       return 0;

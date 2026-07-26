@@ -1,5 +1,6 @@
 import json
 import os
+import threading
 from pathlib import Path
 from typing import Iterable
 
@@ -18,7 +19,17 @@ class CorruptedLedgerError(Exception):
 class Ledger:
     """G-Set CRDT of immutable hazard events. Merge = set union, keyed on
     event_id = f"{node_id}:{seq}". No wall-clock trust: ordering is Lamport,
-    identity is (node_id, seq) — see CLAUDE.md Critical Rule 2 / ROADMAP D5."""
+    identity is (node_id, seq) — see CLAUDE.md Critical Rule 2 / ROADMAP D5.
+
+    Thread-safe: FastAPI dispatches plain `def` route handlers to a real OS
+    thread pool (Starlette's run_in_threadpool), so append_local/merge_remote
+    genuinely run concurrently across threads for a single Ledger instance.
+    Without a lock, concurrent append_local calls race on the seq
+    read-modify-write — on Windows this crashes outright (os.replace raises
+    PermissionError when two threads collide on the same temp path), and
+    even where it doesn't crash, two events could be assigned the same seq,
+    silently dropping one hazard to G-Set dedup. Found via Phase 5 chaos
+    testing (concurrent POST /ingest), not by inspection."""
 
     def __init__(self, node_id: str, data_dir: Path):
         self.node_id = node_id
@@ -26,6 +37,7 @@ class Ledger:
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self._ledger_path = self.data_dir / "ledger.jsonl"
         self._seq_path = self.data_dir / "seq.txt"
+        self._lock = threading.Lock()
 
         self._events: dict[str, EventEnvelope] = {}
         self._lamport = 0
@@ -112,28 +124,35 @@ class Ledger:
         return True
 
     def append_local(self, payload: HazardPayload) -> EventEnvelope:
-        """Create and persist a new event authored by this node."""
-        next_seq = self._local_seq + 1
-        self._persist_seq(next_seq)
-        self._local_seq = next_seq
-        self._lamport += 1
+        """Create and persist a new event authored by this node. Locked:
+        the seq read-modify-write is not safe across concurrent callers."""
+        with self._lock:
+            next_seq = self._local_seq + 1
+            self._persist_seq(next_seq)
+            self._local_seq = next_seq
+            self._lamport += 1
 
-        envelope = EventEnvelope(
-            event_id=f"{self.node_id}:{next_seq}",
-            node_id=self.node_id,
-            seq=next_seq,
-            lamport=self._lamport,
-            payload=payload,
-        )
-        self._apply(envelope)
-        self._append_to_disk(envelope)
-        return envelope
+            envelope = EventEnvelope(
+                event_id=f"{self.node_id}:{next_seq}",
+                node_id=self.node_id,
+                seq=next_seq,
+                lamport=self._lamport,
+                payload=payload,
+            )
+            self._apply(envelope)
+            self._append_to_disk(envelope)
+            return envelope
 
     def merge_remote(self, envelope: EventEnvelope) -> bool:
-        """Merge one remote event. Idempotent — returns False if already known."""
-        if envelope.event_id in self._events:
+        """Merge one remote event. Idempotent — returns False if already
+        known. Locked: check-then-insert on self._events is not atomic
+        without it."""
+        with self._lock:
+            return self._apply_and_persist(envelope)
+
+    def _apply_and_persist(self, envelope: EventEnvelope) -> bool:
+        if not self._apply(envelope):
             return False
-        self._apply(envelope)
         self._append_to_disk(envelope)
         return True
 
@@ -143,22 +162,26 @@ class Ledger:
 
     # ---- anti-entropy (D6) ----
 
+    def _snapshot(self) -> list[EventEnvelope]:
+        """A brief lock hold to copy the current events out, so callers can
+        iterate without racing a concurrent writer's dict mutation (which
+        would otherwise risk 'dictionary changed size during iteration')."""
+        with self._lock:
+            return list(self._events.values())
+
     def vector(self) -> dict[str, int]:
         """Per-node-id max seq seen across the whole ledger."""
         vec: dict[str, int] = {}
-        for envelope in self._events.values():
+        for envelope in self._snapshot():
             vec[envelope.node_id] = max(vec.get(envelope.node_id, 0), envelope.seq)
         return vec
 
     def events_since(self, since: dict[str, int]) -> list[EventEnvelope]:
         """Events the caller (whose view is `since`) is missing."""
-        return [
-            e for e in self._events.values()
-            if e.seq > since.get(e.node_id, 0)
-        ]
+        return [e for e in self._snapshot() if e.seq > since.get(e.node_id, 0)]
 
     def all_events(self) -> list[EventEnvelope]:
-        return list(self._events.values())
+        return self._snapshot()
 
     def __len__(self) -> int:
-        return len(self._events)
+        return len(self._snapshot())

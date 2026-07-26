@@ -238,6 +238,70 @@ it lands. `maplibre-gl@6` note: default export removed, named imports only.
 appears on C's map; B partitioned mid-demo with ingest on both sides, rejoins, converges —
 reproducible from the README alone.
 
+**Status:** chaos matrix green — and it earned its keep, surfacing two real bugs that had
+been latent since Phase 1 and Phase 3:
+
+1. **`Ledger` had zero thread-safety**, discovered by the concurrent-ingest chaos
+   scenario. Every ledger_service route is a plain `def`, so FastAPI/Starlette dispatches
+   it to a real OS thread pool (`anyio.to_thread.run_sync`) — concurrent requests
+   genuinely run on different threads, not just different asyncio tasks. `append_local`'s
+   seq read-modify-write wasn't locked: on Windows, 50 concurrent `POST /ingest` calls
+   crashed the server outright (`os.replace` raised `PermissionError` when two threads
+   collided on the same temp seq-file path); more subtly, even without a crash, two
+   threads could compute the same seq and silently drop one hazard to G-Set dedup. Fixed
+   with a `threading.Lock()` around every mutating and reading path in `Ledger`. Verified
+   with 100 truly concurrent `POST /ingest` calls against a live server: zero collisions,
+   zero crashes, exactly 100 events recovered. Permanent regression test:
+   `tests/test_chaos_concurrent_ingest.py` (fast, in-process, real `threading.Thread`).
+2. **`pullFromPeer`'s timeout only covered the dial, not the read.** `AbortSignal.timeout`
+   passed to `dialProtocol` bounds connection setup only — once the stream exists, a peer
+   that accepts it and never sends anything back hung the reader indefinitely, contrary
+   to CLAUDE.md's "explicit timeouts everywhere." Worse: the periodic anti-entropy sweep
+   loops over peers sequentially, so *one* hung peer would have silently starved sync for
+   *every* other peer too. Fixed with an explicit `Promise.race` deadline wrapping the
+   read (and, symmetrically, the responder's read of the requester's vector) in
+   `sync-protocol.js`. Verified against a real hung responder (never mocked):
+   `src/network/chaos-slow-peer-test.mjs` — returns cleanly at ~1018ms against a
+   1000ms budget instead of hanging for the peer's full 15s stall.
+
+Rest of the chaos matrix: clock-skew-is-a-non-event proven both structurally (`ledger.py`
+never imports `datetime`/`time.time`) and behaviorally (backwards/scrambled payload
+timestamps have zero effect on seq/lamport/merge order) —
+`tests/test_chaos_clock_skew.py`. Duplicate injection stays idempotent under genuine
+concurrent replay (not just sequential), `tests/test_chaos_duplicate_injection.py`. Crash
+mid-write validated with a real `SIGKILL`/`TerminateProcess` against a live server under
+concurrent write pressure across 5 iterations — 0 lost acknowledged writes, 0 phantom
+events every time (one iteration even naturally hit the "fsync'd but response lost" edge
+case: 32 recovered vs. 31 acknowledged, exactly the tolerance the assertion allows) —
+`scripts/chaos_crash_mid_write.py`.
+
+`scripts/simulate_disconnect.py` (+ `.sh` wrapper) is a *different* failure mode than
+Phase 3's kill/restart: ledger services stay alive the whole time, only the transport is
+cut, both sides keep accepting local ingest and provably diverge, then heal and
+reconverge to a byte-identical event set (~1s). This is the actual CRDT
+partition-tolerance property, not just "did the file survive a restart."
+
+**RAM/CPU profile** (this laptop; see risk register for the Pi 4 budget check):
+
+| Component | Idle working set | Idle CPU (5s window) |
+|---|---|---|
+| `ledger_service` (Python/FastAPI/uvicorn) | 47 MB | 0.00s |
+| `peer.js` (Node/libp2p) | 73 MB | 0.05s |
+| Dashboard production build | 1.2 MB (1.1 MB JS + 72 KB CSS) | n/a (browser-side) |
+
+Combined backend footprint per node (~120 MB) is ~6% of a 2 GB Pi budget even before
+Phase 1's measured +41 MB/10k-events ledger growth. Near-zero idle CPU confirms the
+periodic-poll design (2s local-change check, 30s anti-entropy sweep, no busy loops) is
+what it looks like on paper.
+
+**M3 (3 physical devices on a hotspot) requires real hardware — unverified in this
+environment**, same class of blocker as Ollama/admin-rights (Phase 0) and
+mDNS-on-a-second-machine (Phase 3). What *is* verified end-to-end on one machine:
+`scripts/multi_node_harness.py` (3-node cold-start convergence + kill/restart, ~2s) and
+`scripts/simulate_disconnect.py` (true partition + divergence + heal, ~1s) — see
+[README.md](README.md) for the runnable single-machine demo standing in for M3, and what
+changes once real hardware is available.
+
 ## Phase 6 — Edge Hardware Deployment *(Haiku 4.5 / Sonnet 5; optional but recommended)*
 
 The phase that makes the project's premise true — until here, "edge device" meant a laptop.
@@ -258,7 +322,9 @@ The phase that makes the project's premise true — until here, "edge device" me
 |---|---|---|
 | Windows Firewall silently drops mDNS multicast | 3 | Documented in Phase 0; second-physical-machine exit check in Phase 3 |
 | phi3:mini extraction quality too low | 2 | Structured outputs first; eval fixtures; pre-agreed Opus escalation; llama3:8b fallback if RAM allows |
-| OneDrive sync fights JSONL fsync / file locks | 1 | Crash tests surface it early; if it bites, move `data/` out of OneDrive scope and document |
+| OneDrive sync fights JSONL fsync / file locks | 1 | **Resolved (Phase 5):** measured directly — 6.1ms/write inside the OneDrive-synced repo vs. 6.0ms/write in a non-synced temp dir, no meaningful difference. Not an issue on this setup. |
+| `Ledger` not thread-safe under FastAPI's real thread-pool dispatch | 5 | **Resolved:** found via chaos testing (concurrent `POST /ingest` crashed the server on Windows), fixed with `threading.Lock()`, verified at 100 concurrent requests with zero collisions |
+| Peer sync timeout only covered dial, not read — one hung peer could starve anti-entropy for everyone | 5 | **Resolved:** explicit read-side deadline added in `sync-protocol.js`, verified against a real hung responder |
 | Clock skew corrupts ordering | 1 | Designed out: Lamport + `(node_id, seq)` identity; chaos-tested in Phase 5 |
 | True ad-hoc Wi-Fi expectation creep | 3 | Scope decision 1; backlog, not critical path |
 | Offline map tiles ambush Phase 4 | 4 | Region + PMTiles decided at phase start |

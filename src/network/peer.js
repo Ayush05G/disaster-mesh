@@ -61,7 +61,7 @@ async function main() {
     },
   });
 
-  registerSyncHandler(libp2p, ledgerClient, logger);
+  registerSyncHandler(libp2p, ledgerClient, logger, timeoutMs);
 
   let lastKnownLocalSeq = 0;
 
