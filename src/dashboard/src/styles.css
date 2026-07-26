@@ -1,0 +1,248 @@
+/* System font stack only — a @font-face pointing at a CDN would violate
+   Critical Rule 1, and the audit script + CSP would both catch it. */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  background: #0b0e11;
+  color: #d7dee6;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: #12171d;
+  border-bottom: 1px solid #232d36;
+}
+
+.topbar h1 {
+  font-size: 15px;
+  letter-spacing: 2px;
+  margin: 0;
+  color: #7fd1ff;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  flex: 1;
+  min-height: 0;
+}
+
+.map-container {
+  width: 100%;
+  height: 100%;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-left: 1px solid #232d36;
+  background: #0e1319;
+}
+
+.panel {
+  padding: 12px 14px;
+  border-bottom: 1px solid #1b232c;
+}
+
+.panel h2 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: #8fa3b5;
+  margin: 0 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.panel-feed {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.badge {
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 9px;
+}
+
+.badge-up {
+  background: #123d24;
+  color: #4ade80;
+}
+
+.badge-down {
+  background: #431418;
+  color: #ff6b6b;
+}
+
+.badge-count {
+  background: #1c2733;
+  color: #7fd1ff;
+}
+
+.node-self {
+  font-size: 12px;
+  color: #8fa3b5;
+  margin-bottom: 8px;
+}
+
+.empty {
+  font-size: 12px;
+  color: #5c6b7a;
+  padding: 6px 0;
+}
+
+.peer-list,
+.feed-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.feed-list {
+  overflow-y: auto;
+  flex: 1;
+}
+
+.peer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  padding: 4px 0;
+}
+
+.peer-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #4ade80;
+  flex-shrink: 0;
+}
+
+.peer-silent .peer-dot {
+  background: #5c6b7a;
+}
+
+.peer-id {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  font-family: Consolas, monospace;
+  font-size: 11px;
+}
+
+.peer-age {
+  color: #5c6b7a;
+  flex-shrink: 0;
+}
+
+.feed-item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 0;
+  font-size: 12px;
+  border-bottom: 1px solid #151c24;
+}
+
+.feed-type {
+  flex: 1;
+}
+
+.feed-meta {
+  color: #5c6b7a;
+  font-family: Consolas, monospace;
+  font-size: 10px;
+}
+
+.feed-truncated {
+  font-size: 11px;
+  color: #5c6b7a;
+  padding-top: 6px;
+  text-align: center;
+}
+
+.sev {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.sev-LOW {
+  background: #10283f;
+  color: #4a9eff;
+}
+
+.sev-MEDIUM {
+  background: #3d2c10;
+  color: #ffb020;
+}
+
+.sev-HIGH {
+  background: #431418;
+  color: #ff4d4d;
+}
+
+.severity-filter {
+  display: flex;
+  gap: 6px;
+}
+
+.filter-btn {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 4px;
+  border: 1px solid #232d36;
+  background: transparent;
+  color: #5c6b7a;
+  cursor: pointer;
+}
+
+.filter-btn.on.sev-LOW {
+  background: #10283f;
+  color: #4a9eff;
+  border-color: #4a9eff;
+}
+
+.filter-btn.on.sev-MEDIUM {
+  background: #3d2c10;
+  color: #ffb020;
+  border-color: #ffb020;
+}
+
+.filter-btn.on.sev-HIGH {
+  background: #431418;
+  color: #ff4d4d;
+  border-color: #ff4d4d;
+}
+
+.popup {
+  color: #101418;
+  font-size: 12px;
+}
+
+.maplibregl-popup-content {
+  padding: 8px 12px;
+}

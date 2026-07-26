@@ -1,0 +1,102 @@
+[
+  {
+    "text": "Flooding reported downtown, water rising fast near Main St bridge",
+    "hazard_type_keywords": ["flood", "water"],
+    "expected_severity": "HIGH"
+  },
+  {
+    "text": "Minor puddling on Elm Street after the rain, nothing serious",
+    "hazard_type_keywords": ["flood", "water"],
+    "expected_severity": "LOW"
+  },
+  {
+    "text": "Fire spotted in the old warehouse district, heavy smoke visible",
+    "hazard_type_keywords": ["fire", "smoke"],
+    "expected_severity": "HIGH"
+  },
+  {
+    "text": "Small kitchen fire at the corner cafe, already contained by staff",
+    "hazard_type_keywords": ["fire"],
+    "expected_severity": "LOW"
+  },
+  {
+    "text": "Building showing large cracks after the tremor, residents evacuating",
+    "hazard_type_keywords": ["collapse", "structural", "building"],
+    "expected_severity": "HIGH"
+  },
+  {
+    "text": "Hairline crack noticed in the parking garage support column",
+    "hazard_type_keywords": ["collapse", "structural", "crack"],
+    "expected_severity": "MEDIUM"
+  },
+  {
+    "text": "Strong gas smell reported near the school, evacuation underway",
+    "hazard_type_keywords": ["gas", "leak"],
+    "expected_severity": "HIGH"
+  },
+  {
+    "text": "Faint gas odor near the old pipeline, maintenance has been notified",
+    "hazard_type_keywords": ["gas", "leak"],
+    "expected_severity": "MEDIUM"
+  },
+  {
+    "text": "Water contamination alert issued for the northern well supply",
+    "hazard_type_keywords": ["contamination", "water"],
+    "expected_severity": "HIGH"
+  },
+  {
+    "text": "Slight discoloration noticed in tap water, being monitored",
+    "hazard_type_keywords": ["contamination", "water"],
+    "expected_severity": "LOW"
+  },
+  {
+    "text": "Multiple people trapped under rubble after the building collapsed entirely",
+    "hazard_type_keywords": ["collapse", "structural", "rubble"],
+    "expected_severity": "HIGH"
+  },
+  {
+    "text": "Downed power line sparking on Oak Avenue, road blocked",
+    "hazard_type_keywords": ["power", "electrical", "downed"],
+    "expected_severity": "HIGH"
+  },
+  {
+    "text": "Brief power flicker in the east district, power now restored",
+    "hazard_type_keywords": ["power", "electrical"],
+    "expected_severity": "LOW"
+  },
+  {
+    "text": "Landslide has blocked the mountain access road, no injuries reported",
+    "hazard_type_keywords": ["landslide", "debris", "roadblock"],
+    "expected_severity": "MEDIUM"
+  },
+  {
+    "text": "Major landslide has buried three homes, residents unaccounted for",
+    "hazard_type_keywords": ["landslide", "debris"],
+    "expected_severity": "HIGH"
+  },
+  {
+    "text": "Bridge structurally unsound after flooding, closed to all traffic",
+    "hazard_type_keywords": ["structural", "collapse", "bridge"],
+    "expected_severity": "HIGH"
+  },
+  {
+    "text": "Wildfire spreading toward the residential area, high winds expected",
+    "hazard_type_keywords": ["fire", "wildfire"],
+    "expected_severity": "HIGH"
+  },
+  {
+    "text": "Sewage backup reported in the basement of the community center",
+    "hazard_type_keywords": ["contamination", "sewage", "water"],
+    "expected_severity": "MEDIUM"
+  },
+  {
+    "text": "Chemical spill from an overturned truck on Highway 9",
+    "hazard_type_keywords": ["chemical", "spill", "contamination", "hazmat"],
+    "expected_severity": "HIGH"
+  },
+  {
+    "text": "Aftershock caused minor debris to fall, area cordoned off as a precaution",
+    "hazard_type_keywords": ["debris", "structural", "collapse"],
+    "expected_severity": "MEDIUM"
+  }
+]

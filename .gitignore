@@ -12,7 +12,8 @@ dist/
 .vite/
 
 # Local node state — ledgers are per-device, never shared via git
-data/*.jsonl
+data/*
+!data/.gitkeep
 *.log
 
 # Editor / OS

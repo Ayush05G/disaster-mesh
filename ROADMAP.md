@@ -127,6 +127,15 @@ green; `git log -1 --format='%an <%ae>'` → `ayush05g <ayush2425.rk@gmail.com>`
 **Exit:** property tests green; 10k-event ledger load measured within a Pi-ish memory
 budget (record the number).
 
+**Measured (this laptop, Python 3.12.10):** 10k events cold-load in 0.2s, 41 MB RSS delta
+(single Ledger instance, isolated process), 2.16 MB on disk. Comfortably inside a 2 GB Pi
+budget even with headroom for the other two processes. Write throughput is ~157
+events/sec (6.4 ms/event) — the cost of fsync-per-append, a deliberate crash-safety
+tradeoff (see `_append_to_disk`). Fine for hazard-reporting cadence; would need revisiting
+only if a single node's *local* ingest rate ever needed to sustain >100 events/sec, which
+this project doesn't anticipate. Unbounded event growth over a long deployment remains a
+backlog item (ledger compaction).
+
 ## Phase 2 — Edge AI Engine *(Sonnet 5)*
 
 - Async Ollama client, `timeout=5.0`, **structured outputs** (`format` = payload JSON
@@ -140,6 +149,15 @@ budget (record the number).
 **Exit:** worker survives model-off / model-slow / garbage-output; **M1** — sensor text
 in, valid hazard in ledger, mock *and* real.
 
+**Status:** M1 verified end-to-end in mock mode (real ledger service, real HTTP, no
+sockets skipped) — 5/5 demo hazards ingested. Chaos tests cover model-off, model-slow,
+garbage-output, ledger-unreachable, and mixed failures mid-batch; the worker never raises
+in any of them. The eval harness (`scripts/run_eval.py`, 20 fixtures) is built and unit
+tested, but the *real* pass-rate number — the one the Opus escalation trigger reads — is
+blocked on the same Ollama install issue as Phase 0 (admin rights). Until resolved: run
+`ollama pull phi3:mini` then `python scripts/run_eval.py --backend ollama` to get the real
+number before treating Phase 2 as fully exited.
+
 ## Phase 3 — P2P Mesh Transport *(Sonnet 5 — Node.js per D1)*
 
 - js-libp2p peer: mDNS discovery, gossipsub `aether/hazards/v1`
@@ -150,6 +168,33 @@ in, valid hazard in ledger, mock *and* real.
 **Exit:** 3 local nodes converge from cold start; kill one mid-gossip → restart → catches
 up via anti-entropy; mDNS verified against a second physical machine (the firewall check);
 **M2**.
+
+**Status:** M2 passed — `scripts/multi_node_harness.py` automates both checks (3-node
+cold-start convergence in ~2s; kill node mid-run, ingest elsewhere, restart, reconverge via
+anti-entropy in ~2s), fan-in bootstrap topology, no manual steps. mDNS discovery is
+implemented (`@libp2p/mdns`) and is the production peer-discovery path, but the harness
+uses explicit bootstrap addresses instead of relying on mDNS multicast for same-machine
+determinism — Windows multicast/firewall behavior was already flagged as unverified in the
+risk register below, and this doesn't remove that need. **mDNS-on-a-second-physical-machine
+remains unverified**, same class of blocker as Ollama/admin-rights in earlier phases: needs
+a second device, not something resolvable in this environment.
+
+**Real finding, worth recording so it isn't rediscovered the hard way:**
+`@chainsafe/libp2p-gossipsub@14.1.2` (latest at time of writing) depends on
+`@libp2p/interface@^2.x`, while `libp2p@^3.x` (also latest) depends on
+`@libp2p/interface@^3.x` — gossipsub has not yet been updated for libp2p v3. Installing
+everything at `^latest` (the natural first move) silently splits the dependency tree:
+peers connect fine, anti-entropy works, but gossipsub's `getSubscribers()` never returns
+anyone and live gossip never fires — no error, just permanent silence. `src/network/package.json`
+pins the whole stack to the last mutually-compatible v2-line versions (`libp2p@2.10.0`,
+`@libp2p/tcp@10.1.19`, `@libp2p/mdns@11.0.47`, `@libp2p/identify@3.0.39`,
+`@chainsafe/libp2p-noise@16.1.5`, `@chainsafe/libp2p-yamux@7.0.4`), verified via
+`npm ls @libp2p/interface` showing a single deduped `2.11.0`. **Do not bump these
+individually** — re-run that check after any version change in `src/network`. On this
+pinned stack, `Stream` is the classic `{source, sink}` async-iterable Duplex (`it-pipe` +
+`it-length-prefixed`); a stray attempt to use `libp2p@3.x`'s newer `MessageStream`
+(`.send()`/native async-iteration/no half-close) during debugging is *not* what's running
+here — don't mix API styles from v3-era docs or examples.
 
 ## Phase 4 — React Dashboard *(Sonnet 5)*
 
@@ -163,6 +208,23 @@ up via anti-entropy; mDNS verified against a second physical machine (the firewa
 **Exit:** fully functional with networking disabled; devtools shows zero non-localhost
 requests; renders 1k hazards without jank.
 
+**Status:** Exit checks verified in a real browser against a live ledger seeded with
+1,000 events across 4 simulated nodes: every network request was `localhost:5173` or an
+inline `data:` URI (nav-control icons) — zero external hosts; map canvas rendering via
+WebGL; Lamport-ordered feed (payload `timestamp` is never used for ordering, per scope
+decision 2); severity filter live-verified (1000 → 317 on HIGH-only); no console errors.
+Defense in depth for Critical Rule 1: (1) `scripts/audit-offline.js` fails `npm run build`
+on any non-allowlisted external URL in `dist/` — its first real catch was React's
+embedded `react.dev/errors/` decoder string, allowlisted as a never-fetched error-message
+URL; (2) a CSP meta tag (`connect-src 'self'` etc.) blocks any accidental external fetch
+in the browser itself; (3) all API calls are relative (`/api/...` via the Vite proxy), so
+no absolute origin exists in the bundle. **Basemap decision:** the map ships with a fully
+inline style (background + graticule + severity-colored hazard circles, deliberately no
+text layers — text would require glyph fetches). The local-PMTiles basemap remains the
+recorded upgrade path, deferred because the region extract is a sized download requiring
+an explicit OK — same class as the phi3:mini pull; nothing in the current map breaks when
+it lands. `maplibre-gl@6` note: default export removed, named imports only.
+
 ## Phase 5 — Resilience & Validation *(Sonnet 5)*
 
 - `scripts/simulate_disconnect.sh` driving the Phase 3 harness: partition → concurrent
@@ -175,6 +237,70 @@ requests; renders 1k hazards without jank.
 **Exit:** chaos matrix green; **M3** — 3 devices on a hotspot, hazard reported on A
 appears on C's map; B partitioned mid-demo with ingest on both sides, rejoins, converges —
 reproducible from the README alone.
+
+**Status:** chaos matrix green — and it earned its keep, surfacing two real bugs that had
+been latent since Phase 1 and Phase 3:
+
+1. **`Ledger` had zero thread-safety**, discovered by the concurrent-ingest chaos
+   scenario. Every ledger_service route is a plain `def`, so FastAPI/Starlette dispatches
+   it to a real OS thread pool (`anyio.to_thread.run_sync`) — concurrent requests
+   genuinely run on different threads, not just different asyncio tasks. `append_local`'s
+   seq read-modify-write wasn't locked: on Windows, 50 concurrent `POST /ingest` calls
+   crashed the server outright (`os.replace` raised `PermissionError` when two threads
+   collided on the same temp seq-file path); more subtly, even without a crash, two
+   threads could compute the same seq and silently drop one hazard to G-Set dedup. Fixed
+   with a `threading.Lock()` around every mutating and reading path in `Ledger`. Verified
+   with 100 truly concurrent `POST /ingest` calls against a live server: zero collisions,
+   zero crashes, exactly 100 events recovered. Permanent regression test:
+   `tests/test_chaos_concurrent_ingest.py` (fast, in-process, real `threading.Thread`).
+2. **`pullFromPeer`'s timeout only covered the dial, not the read.** `AbortSignal.timeout`
+   passed to `dialProtocol` bounds connection setup only — once the stream exists, a peer
+   that accepts it and never sends anything back hung the reader indefinitely, contrary
+   to CLAUDE.md's "explicit timeouts everywhere." Worse: the periodic anti-entropy sweep
+   loops over peers sequentially, so *one* hung peer would have silently starved sync for
+   *every* other peer too. Fixed with an explicit `Promise.race` deadline wrapping the
+   read (and, symmetrically, the responder's read of the requester's vector) in
+   `sync-protocol.js`. Verified against a real hung responder (never mocked):
+   `src/network/chaos-slow-peer-test.mjs` — returns cleanly at ~1018ms against a
+   1000ms budget instead of hanging for the peer's full 15s stall.
+
+Rest of the chaos matrix: clock-skew-is-a-non-event proven both structurally (`ledger.py`
+never imports `datetime`/`time.time`) and behaviorally (backwards/scrambled payload
+timestamps have zero effect on seq/lamport/merge order) —
+`tests/test_chaos_clock_skew.py`. Duplicate injection stays idempotent under genuine
+concurrent replay (not just sequential), `tests/test_chaos_duplicate_injection.py`. Crash
+mid-write validated with a real `SIGKILL`/`TerminateProcess` against a live server under
+concurrent write pressure across 5 iterations — 0 lost acknowledged writes, 0 phantom
+events every time (one iteration even naturally hit the "fsync'd but response lost" edge
+case: 32 recovered vs. 31 acknowledged, exactly the tolerance the assertion allows) —
+`scripts/chaos_crash_mid_write.py`.
+
+`scripts/simulate_disconnect.py` (+ `.sh` wrapper) is a *different* failure mode than
+Phase 3's kill/restart: ledger services stay alive the whole time, only the transport is
+cut, both sides keep accepting local ingest and provably diverge, then heal and
+reconverge to a byte-identical event set (~1s). This is the actual CRDT
+partition-tolerance property, not just "did the file survive a restart."
+
+**RAM/CPU profile** (this laptop; see risk register for the Pi 4 budget check):
+
+| Component | Idle working set | Idle CPU (5s window) |
+|---|---|---|
+| `ledger_service` (Python/FastAPI/uvicorn) | 47 MB | 0.00s |
+| `peer.js` (Node/libp2p) | 73 MB | 0.05s |
+| Dashboard production build | 1.2 MB (1.1 MB JS + 72 KB CSS) | n/a (browser-side) |
+
+Combined backend footprint per node (~120 MB) is ~6% of a 2 GB Pi budget even before
+Phase 1's measured +41 MB/10k-events ledger growth. Near-zero idle CPU confirms the
+periodic-poll design (2s local-change check, 30s anti-entropy sweep, no busy loops) is
+what it looks like on paper.
+
+**M3 (3 physical devices on a hotspot) requires real hardware — unverified in this
+environment**, same class of blocker as Ollama/admin-rights (Phase 0) and
+mDNS-on-a-second-machine (Phase 3). What *is* verified end-to-end on one machine:
+`scripts/multi_node_harness.py` (3-node cold-start convergence + kill/restart, ~2s) and
+`scripts/simulate_disconnect.py` (true partition + divergence + heal, ~1s) — see
+[README.md](README.md) for the runnable single-machine demo standing in for M3, and what
+changes once real hardware is available.
 
 ## Phase 6 — Edge Hardware Deployment *(Haiku 4.5 / Sonnet 5; optional but recommended)*
 
@@ -196,11 +322,14 @@ The phase that makes the project's premise true — until here, "edge device" me
 |---|---|---|
 | Windows Firewall silently drops mDNS multicast | 3 | Documented in Phase 0; second-physical-machine exit check in Phase 3 |
 | phi3:mini extraction quality too low | 2 | Structured outputs first; eval fixtures; pre-agreed Opus escalation; llama3:8b fallback if RAM allows |
-| OneDrive sync fights JSONL fsync / file locks | 1 | Crash tests surface it early; if it bites, move `data/` out of OneDrive scope and document |
+| OneDrive sync fights JSONL fsync / file locks | 1 | **Resolved (Phase 5):** measured directly — 6.1ms/write inside the OneDrive-synced repo vs. 6.0ms/write in a non-synced temp dir, no meaningful difference. Not an issue on this setup. |
+| `Ledger` not thread-safe under FastAPI's real thread-pool dispatch | 5 | **Resolved:** found via chaos testing (concurrent `POST /ingest` crashed the server on Windows), fixed with `threading.Lock()`, verified at 100 concurrent requests with zero collisions |
+| Peer sync timeout only covered dial, not read — one hung peer could starve anti-entropy for everyone | 5 | **Resolved:** explicit read-side deadline added in `sync-protocol.js`, verified against a real hung responder |
 | Clock skew corrupts ordering | 1 | Designed out: Lamport + `(node_id, seq)` identity; chaos-tested in Phase 5 |
 | True ad-hoc Wi-Fi expectation creep | 3 | Scope decision 1; backlog, not critical path |
 | Offline map tiles ambush Phase 4 | 4 | Region + PMTiles decided at phase start |
 | phi3 doesn't fit Pi 4 2 GB | 6 | Mock-only Pi node is acceptable — Pi still meshes and displays; record the measurement |
+| gossipsub/libp2p-core version split (gossipsub still targets `@libp2p/interface@^2.x`) silently kills live gossip | 3 | Whole `src/network` stack pinned to the mutually-compatible v2 line; verify with `npm ls @libp2p/interface` after any dependency change |
 
 ## Explicitly not phases (backlog)
 

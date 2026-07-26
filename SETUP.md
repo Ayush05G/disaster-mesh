@@ -16,15 +16,67 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-## Ollama (Phase 1+)
+## Ledger service (Phase 1)
 
-Phase 0 uses `AETHER_AI_BACKEND=mock` and does not require Ollama.
+The D4 API contract. Runs on `localhost:8700`, localhost only.
 
-For Phase 1+:
+```powershell
+uvicorn ai_engine.ledger_service:get_app --factory --host 127.0.0.1 --port 8700
+```
+
+`get_app` is a factory (not a module-level `app`) so importing the module never has a
+disk side effect — see the docstring in `ledger_service.py` if that seems unusual.
+
+Env vars: `AETHER_NODE_ID` (default `node_local`), `AETHER_DATA_DIR` (default `data/<node_id>`).
+
+## Ollama (Phase 2+)
+
+Phase 0 and Phase 1 use `AETHER_AI_BACKEND=mock` and do not require Ollama.
+
+For Phase 2+:
 1. Install Ollama for Windows from https://ollama.ai
 2. Pull the model: `ollama pull phi3:mini` (~2.3 GB)
 3. Verify it's running: `curl http://localhost:11434/api/status`
 4. Run the worker: `python src/ai_engine/main.py`
+
+## P2P mesh transport (Phase 3)
+
+```powershell
+cd src\network
+npm install
+node peer.js
+```
+
+Env vars: `AETHER_NODE_ID`, `AETHER_LEDGER_URL` (default `http://127.0.0.1:8700`),
+`AETHER_P2P_PORT` (default `9000`), `AETHER_DATA_DIR`, `AETHER_BOOTSTRAP_PEERS`
+(comma-separated multiaddrs — supplements mDNS, useful when multicast is blocked).
+
+Dependency versions in `src/network/package.json` are pinned, not `^latest` — gossipsub
+hasn't caught up to libp2p's latest major yet, and mixing them breaks gossip silently.
+See ROADMAP Phase 3 status before changing any of them.
+
+To exercise the whole transport locally (3-node convergence + kill/restart catch-up),
+without needing a second physical machine:
+```powershell
+python scripts\multi_node_harness.py --nodes 3
+```
+
+## Dashboard (Phase 4)
+
+```powershell
+cd src\dashboard
+npm install
+npm run dev        # dev server on 127.0.0.1:5173, proxies /api -> localhost:8700
+```
+
+Production build + offline audit (fails if any external URL lands in `dist/`):
+```powershell
+npm run build
+npm run preview    # serve the built dist locally
+```
+
+The ledger service must be running on `:8700` for live data. The map style is fully
+inline (no tiles, no glyphs, no sprite) — see BACKLOG for the PMTiles basemap upgrade.
 
 ## Windows Firewall
 

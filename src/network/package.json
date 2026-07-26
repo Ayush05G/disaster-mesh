@@ -1,0 +1,28 @@
+{
+  "name": "aether-network",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Aether P2P mesh transport (ROADMAP D1: Node.js + js-libp2p). Stateless relay — never touches the ledger JSONL directly, only the D4 REST API.",
+  "type": "module",
+  "main": "peer.js",
+  "scripts": {
+    "start": "node peer.js",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "libp2p": "2.10.0",
+    "@libp2p/tcp": "10.1.19",
+    "@libp2p/mdns": "11.0.47",
+    "@chainsafe/libp2p-gossipsub": "^14.1.2",
+    "@chainsafe/libp2p-noise": "16.1.5",
+    "@chainsafe/libp2p-yamux": "7.0.4",
+    "@libp2p/identify": "3.0.39",
+    "uint8arrays": "^5.0.0",
+    "@multiformats/multiaddr": "^12.0.0",
+    "it-pipe": "^3.0.1",
+    "it-length-prefixed": "^9.0.4"
+  },
+  "devDependencies": {
+    "eslint": "^9.0.0"
+  }
+}

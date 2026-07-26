@@ -60,9 +60,14 @@ Set `AETHER_AI_BACKEND=mock` to run the ingestion worker against `MockHazardExtr
 
 ### P2P Mesh Network (Node.js — decision D1)
 ```bash
-npm install libp2p @libp2p/mdns @libp2p/tcp @chainsafe/libp2p-gossipsub
-node src/network/peer.js
+cd src/network
+npm install         # versions are pinned in package.json — do not `npm install <pkg>@latest`
+node peer.js
 ```
+`@chainsafe/libp2p-gossipsub` still targets `@libp2p/interface@^2.x` while `libp2p` is on
+`^3.x` — installing anything at `^latest` individually silently splits the tree and gossip
+stops working with no error (see ROADMAP Phase 3 status). After any dependency change in
+`src/network`, verify with `npm ls @libp2p/interface` that everything dedupes to one version.
 
 ### Quality Assurance & Validation
 ```bash
