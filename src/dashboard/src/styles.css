@@ -238,6 +238,129 @@ body {
   border-color: #ff4d4d;
 }
 
+/* --- store & forward --- */
+.info-toggle {
+  margin-left: auto;
+  font-size: 10px;
+  text-transform: none;
+  letter-spacing: 0;
+  padding: 2px 8px;
+  border-radius: 9px;
+  border: 1px solid #232d36;
+  background: transparent;
+  color: #7fd1ff;
+  cursor: pointer;
+}
+
+.posture {
+  font-size: 12px;
+  line-height: 1.45;
+  padding: 8px 10px;
+  border-radius: 4px;
+  border-left: 3px solid;
+  margin-bottom: 10px;
+}
+
+.posture.carrying {
+  background: #2a2110;
+  border-color: #ffb020;
+  color: #ffd48a;
+}
+
+.posture.syncing {
+  background: #10281a;
+  border-color: #4ade80;
+  color: #93e8b4;
+}
+
+.posture.isolated,
+.posture.idle {
+  background: #161b21;
+  border-color: #3a4753;
+  color: #8fa3b5;
+}
+
+.sf-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin: 0 0 10px;
+}
+
+.sf-stats > div {
+  background: #141a21;
+  border-radius: 4px;
+  padding: 7px 8px;
+  text-align: center;
+}
+
+.sf-stats dt {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #6d7f90;
+  margin-bottom: 3px;
+}
+
+.sf-stats dd {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  color: #d7dee6;
+}
+
+.origin-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.origin-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 11px;
+  padding: 3px 0;
+  border-bottom: 1px solid #151c24;
+}
+
+.origin-id {
+  font-family: Consolas, monospace;
+  color: #a8b8c6;
+}
+
+.origin-count {
+  color: #6d7f90;
+}
+
+.sf-explainer {
+  margin-top: 10px;
+  padding: 9px 10px;
+  background: #10151b;
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #9fb0c0;
+}
+
+.sf-explainer p {
+  margin: 0 0 8px;
+}
+
+.sf-explainer p:last-child {
+  margin-bottom: 0;
+}
+
+.sf-caveat {
+  color: #7d8fa0;
+  border-top: 1px solid #1b232c;
+  padding-top: 7px;
+}
+
+.sf-explainer strong {
+  color: #b9c8d5;
+}
+
 .popup {
   color: #101418;
   font-size: 12px;

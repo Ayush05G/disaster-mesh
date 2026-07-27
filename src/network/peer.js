@@ -82,10 +82,26 @@ async function main() {
     }
   });
 
+  // Report peer liveness to the ledger service so the dashboard can show
+  // who is actually in range right now. Without this the D4 /peers endpoint
+  // stays permanently empty and the dashboard can't distinguish "connected
+  // to the mesh" from "carrying data with nobody in range" — which is the
+  // whole store-and-forward story.
+  async function reportPeer(peerId, connection) {
+    try {
+      const address = connection?.remoteAddr?.toString() ?? null;
+      await ledgerClient.heartbeat(peerId.toString(), address);
+    } catch (err) {
+      logger.warn(`peer heartbeat failed for ${peerId.toString()}: ${err.message}`);
+    }
+  }
+
   // --- anti-entropy on peer connect (D6) ---
   libp2p.addEventListener("peer:connect", async (evt) => {
     const peerId = evt.detail;
     logger.info(`peer connected: ${peerId.toString()}`);
+    const connection = libp2p.getConnections(peerId)[0];
+    await reportPeer(peerId, connection);
     const merged = await pullFromPeer(libp2p, ledgerClient, peerId, timeoutMs, logger);
     if (merged > 0) {
       logger.info(`anti-entropy (on connect) merged ${merged} events from ${peerId.toString()}`);
@@ -95,6 +111,7 @@ async function main() {
   // --- periodic anti-entropy sweep across all connected peers (D6: 30s) ---
   const antiEntropyTimer = setInterval(async () => {
     for (const connection of libp2p.getConnections()) {
+      await reportPeer(connection.remotePeer, connection);
       const merged = await pullFromPeer(
         libp2p, ledgerClient, connection.remotePeer, timeoutMs, logger,
       );
