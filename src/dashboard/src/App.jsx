@@ -5,6 +5,7 @@ import { HazardMap } from "./components/HazardMap.jsx";
 import { PeerPanel } from "./components/PeerPanel.jsx";
 import { EventFeed } from "./components/EventFeed.jsx";
 import { SeverityFilter } from "./components/SeverityFilter.jsx";
+import { StoreAndForward } from "./components/StoreAndForward.jsx";
 
 const EVENTS_POLL_MS = 2000;
 const PEERS_POLL_MS = 5000;
@@ -47,6 +48,9 @@ export default function App() {
         <HazardMap hazards={hazards} />
         <aside className="sidebar">
           <PeerPanel peers={peers} health={health} stale={stale} />
+          {/* Unfiltered `events` on purpose: this panel describes mesh
+              carry/forward state, not the severity-filtered hazard view. */}
+          <StoreAndForward events={events} peers={peers} health={health} />
           <EventFeed hazards={hazards} />
         </aside>
       </main>

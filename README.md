@@ -95,6 +95,39 @@ To see it visually: start one node's ledger service + a few `POST /ingest` calls
 the harness and point `AETHER_LEDGER_URL`/the dashboard's Vite proxy at one of its ports),
 then `npm run dev` in `src/dashboard`. The map, peer panel, and event feed update live.
 
+## Store-and-forward: how reports spread without a continuous network
+
+Aether does **not** assume every device can reach every other device. In a real
+disaster they can't: V1 connects nodes over a shared LAN segment (a hotspot or router),
+so devices outside that segment have no IP path at all — and no gossip protocol can
+invent a physical link that isn't there.
+
+What makes the system still work is that the ledger is a **grow-only CRDT (G-Set)**, so
+merge is commutative, associative, and idempotent. Two nodes reconcile correctly
+whenever they happen to meet — in any order, after any gap, any number of times. That
+turns a device that physically moves between disconnected clusters into a transport in
+its own right: it carries everything it holds and hands it over on the next contact.
+A report authored by node A can reach node D having never had an end-to-end path,
+because a rescue worker's phone synced with A at one location and D at another.
+
+The dashboard's **Store & Forward** panel makes this visible:
+
+| Shown | Meaning |
+|---|---|
+| Authored here | Reports this device originated itself |
+| Carried for others | Reports received from elsewhere in the mesh, retained for onward delivery |
+| Peers in range | Peers currently heartbeating (live connections) |
+| Posture line | Interprets the combination — e.g. *"Carrying 11 reports from 2 other nodes with no peer in range — will forward on next contact."* |
+
+**What is tracked:** which node originally authored each report (`node_id`, `seq`) and
+its causal order (`lamport`). **What is not:** the route a report travelled, which peer
+relayed it, or when it arrived. The D5 envelope records origin and ordering only — the
+dashboard deliberately does not claim a delivery path the system never observed.
+
+The gap this leaves is bridging clusters *without* a human carrying the device. That
+needs a transport that relays at short range on its own — BLE mesh or LoRa — both
+tracked in [BACKLOG.md](BACKLOG.md), neither built.
+
 ## Chaos matrix
 
 ```bash
